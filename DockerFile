@@ -1,0 +1,29 @@
+FROM php:8.2-cli
+
+# Install system dependencies and PHP extensions required by Laravel & SQLite
+RUN apt-get update && apt-get install -y \
+    git unzip libsqlite3-dev nodejs npm \
+    && docker-php-ext-install pdo pdo_sqlite
+
+# Set working directory
+WORKDIR /app
+
+# Copy all project files into container
+COPY . .
+
+# Install PHP dependencies
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+RUN composer install --no-dev --optimize-autoloader
+
+# Install Node dependencies & build front-end + text embeddings
+RUN npm install
+RUN npm run build
+RUN npm run build:text-embeddings
+
+# Set permissions
+RUN chmod -R 775 storage bootstrap/cache
+
+EXPOSE 10000
+
+# Start command
+CMD touch database/database.sqlite && php artisan migrate:fresh --seed --force && php artisan serve --host=0.0.0.0 --port=10000
