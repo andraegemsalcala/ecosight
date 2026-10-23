@@ -1,0 +1,14 @@
+# EcoSight Bug Log
+
+Each entry records a bug found during development, the file involved, the cause, and the fix.
+
+| # | Bug | File(s) | Cause | Fix |
+|---|-----|---------|-------|-----|
+| 1 | Registration flow broke Breeze's email-verification tests: "Call to undefined method createUnverifiedUser()" | `database/factories/UserFactory.php` | Factory was missing the `unverified()` state the Breeze tests rely on | Added the `unverified()` state (email + `email_verified_at = null`) |
+| 2 | `GET /animals/create` was matched by `GET /animals/{animal}` and returned 404/incorrect route | `routes/web.php` | The public resource `Route::resource('animals', ...)->only(['index','show'])` was registered **before** the auth resource, so `animals/{animal}` captured `create` | Moved the public `only(['index','show'])` registration to run **after** the auth group (same names/URIs, intended behavior restored) + regression test `AnimalRouteOrderTest` |
+| 3 | Scanner fired a `no-animal-detected` event on every detection frame (~every 180 ms), flooding the event log | `public/js/scanner.js` | `processPredictions()` called `sendEvent('detection-failed', ...)` from the endless `requestAnimationFrame` loop with no rate limiting | Added client-side dedupe: same `type`+`reason` sent at most once per 30 s (`sendEvent()` + `lastEventSent` map) |
+| 4 | Form labels in the "Add action" rows had no `for`/`id` association | `resources/views/animals/action-row.blade.php` | Labels and inputs used only `name` attributes; label/text was not programmatically associated | Added unique `id`s (`actions_{index}_*`) and matching `for` attributes |
+| 5 | Animal library search field had no label (placeholder only), failing implicit labeling | `resources/views/animals/index.blade.php` | Search input relied on `placeholder` text | Added a visually-hidden `<label for="search">` |
+| 6 | Graph/skeleton "Loading chart…" overlays had no motion feedback and the page had no global focus-visible cue | `resources/css/app.css`, `resources/views/performance/index.blade.php` | Missing base-layer a11y rules | Added `:focus-visible` outline (brand leaf) and `prefers-reduced-motion` reduction, plus a reusable `.skeleton` shimmer utility applied to chart overlays |
+
+> Environment note (not a code bug): `php artisan serve` deliberately strips most environment variables when spawning the PHP built-in server unless the `--no-reload` flag is used. Web requests then fall back to `.env`. During development we verified with a direct `php -S -t public` (which inherits the shell environment) plus an in-process kernel smoke check. The app's test suite runs against in-memory SQLite via `phpunit.xml` and is unaffected.
